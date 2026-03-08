@@ -94,3 +94,54 @@ Non-Speech Audio: The model focuses solely on speech synthesis and does not hand
 Overlapping Speech: The current model does not explicitly model or generate overlapping speech segments in conversations.
 
 We do not recommend using VibeVoice in commercial or real-world applications without further testing and development. This model is intended for research and development purposes only. Please use responsibly.
+
+
+## n8n + Vertex AI (`imagegeneration@006`) 401 troubleshooting
+
+If your n8n `HTTP Request` node returns:
+
+- `401 UNAUTHENTICATED`
+- `CREDENTIALS_MISSING`
+- `Request is missing required authentication credential`
+
+it is usually because the `Authorization` header is malformed (for example, sent as `=Bearer ...`) or not evaluated as an expression.
+
+Use this known-good configuration:
+
+1. **Method**: `POST`
+2. **URL**: `https://us-central1-aiplatform.googleapis.com/v1/projects/<PROJECT_ID>/locations/us-central1/publishers/google/models/imagegeneration@006:predict`
+3. **Headers** (one row only):
+   - `Authorization` → `Bearer {{$('HTTP Request').first().json.access_token}}`
+   - `Content-Type` → `application/json`
+4. **Body (JSON)**:
+
+```json
+{
+  "instances": [
+    {
+      "prompt": "{{$json.prompt_visual}}"
+    }
+  ],
+  "parameters": {
+    "sampleCount": 1,
+    "aspectRatio": "16:9"
+  }
+}
+```
+
+### Important n8n details
+
+- Do **not** leave a leading `=` in the final evaluated header value.
+- Do **not** paste a second literal token line (e.g. `=Bearer ya29...`) in the same field.
+- In n8n expressions, `{{$...}}` is enough; avoid wrapping the entire value with extra literal characters that produce `=Bearer`.
+- Make sure your OAuth token was requested with the scope:
+  - `https://www.googleapis.com/auth/cloud-platform`
+
+### Quick verification step
+
+Before the image node, add a temporary `Set` node and inspect the computed auth string:
+
+- `auth_debug = Bearer {{$('HTTP Request').first().json.access_token}}`
+
+Run once and confirm it starts exactly with `Bearer ` (no `=` prefix) and that the token is not empty.
+
